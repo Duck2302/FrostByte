@@ -1,0 +1,17 @@
+services:
+  master:
+    image: master-node
+    ports:
+      - "8080:8080"
+    networks:
+      - mynetwork
+
+  worker:
+    image: worker-node
+    deploy:
+      replicas: 10
+    networks:
+      - mynetwork
+
+networks:
+  mynetwork:
