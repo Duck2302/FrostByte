@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 )
@@ -20,12 +21,35 @@ func registerWithMaster() {
 	fmt.Println("Registered with master:", hostname)
 }
 
+func storeChunk(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		http.Error(w, "store endpoint only accepts POST requests", http.StatusMethodNotAllowed)
+		return
+	}
+	chunkID := r.URL.Query().Get("chunkID")
+	chunkData, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "Failed to read chunk data", http.StatusInternalServerError)
+		return
+	}
+
+	err = storeChunkInDB(chunkID, chunkData)
+	if err != nil {
+		http.Error(w, "Failed to store chunk in database", http.StatusInternalServerError)
+		return
+	}
+
+	fmt.Fprintf(w, "Chunk %s stored successfully", chunkID)
+}
+
 func main() {
 	registerWithMaster()
 
 	http.HandleFunc("/worker-task", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "Worker %s responding", os.Getenv("HOSTNAME"))
 	})
+
+	http.HandleFunc("/store", storeChunk)
 
 	http.ListenAndServe(":8081", nil)
 }

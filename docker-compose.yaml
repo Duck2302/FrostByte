@@ -9,7 +9,14 @@ services:
   worker:
     image: worker-node
     deploy:
-      replicas: 10
+      replicas: 5
+    networks:
+      - mynetwork
+
+  mongodb:
+    image: mongo:latest
+    ports:
+      - "27017:27017"
     networks:
       - mynetwork
 
