@@ -4,21 +4,25 @@ services:
     ports:
       - "8080:8080"
     networks:
-      - mynetwork
+      - dfs-network
 
   worker:
     image: worker-node
     deploy:
       replicas: 5
+    depends_on:
+      - master
+    ports:
+      - "8081:8081"
     networks:
-      - mynetwork
+      - dfs-network
 
   mongodb:
     image: mongo:latest
     ports:
       - "27017:27017"
     networks:
-      - mynetwork
+      - dfs-network
 
 networks:
-  mynetwork:
+  dfs-network:

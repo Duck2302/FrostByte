@@ -11,7 +11,7 @@ COPY . .
 
 RUN CGO_ENABLED=1 go build -o main main.go database_handler.go
 
-RUN go get go.mongodb.org/mongo-driver/mongo
+RUN go get github.com/mattn/go-sqlite3
 
 EXPOSE 8081
 
