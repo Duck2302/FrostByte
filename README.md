@@ -24,3 +24,6 @@ Store file chunks and serve client requests.
 
 - [ ] proper logging
 - [ ] sqlite config to set maximum possible database size
+- [ ] add health check to worker nodes
+- [ ] implement recovery strategy
+- [ ] add limit on storage capacity of worker nodes
