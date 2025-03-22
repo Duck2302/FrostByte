@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"sync"
 )
@@ -48,13 +49,14 @@ func testWorker(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resp, err := http.Get(fmt.Sprintf("http://%s:8081/worker-task", worker.ID))
+	resp, err := http.Get(fmt.Sprintf("http://%s:8081/worker-test", worker.ID))
 	if err != nil {
 		http.Error(w, "Failed to reach worker", http.StatusInternalServerError)
 		return
 	}
 	defer resp.Body.Close()
 
+	log.Printf("Response from worker %s: %s", id, resp.Status)
 	fmt.Fprintf(w, "Response from worker %s: %s", id, resp.Status)
 }
 

@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 )
@@ -13,12 +14,12 @@ func registerWithMaster() {
 
 	resp, err := http.Get(masterURL)
 	if err != nil {
-		fmt.Println("Failed to register with master:", err)
+		log.Fatal("Failed to register with master:", err)
 		return
 	}
 	defer resp.Body.Close()
 
-	fmt.Println("Registered with master:", hostname)
+	log.Println("Registered with master:", hostname)
 }
 
 func storeChunk(w http.ResponseWriter, r *http.Request) {
@@ -39,13 +40,14 @@ func storeChunk(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	log.Printf("Chunk %s stored successfully", chunkID)
 	fmt.Fprintf(w, "Chunk %s stored successfully", chunkID)
 }
 
 func main() {
 	registerWithMaster()
 
-	http.HandleFunc("/worker-task", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/worker-test", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "Worker %s responding", os.Getenv("HOSTNAME"))
 	})
 

@@ -15,12 +15,6 @@ services:
     networks:
       - dfs-network
 
-  mongodb:
-    image: mongo:latest
-    ports:
-      - "27017:27017"
-    networks:
-      - dfs-network
 
 networks:
   dfs-network:
