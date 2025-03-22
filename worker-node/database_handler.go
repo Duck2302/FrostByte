@@ -1,48 +1,43 @@
 package main
 
 import (
-	"context"
-	"fmt"
+	"database/sql"
 	"log"
-	"time"
 
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	_ "github.com/mattn/go-sqlite3"
 )
 
-var client *mongo.Client
-var chunksCollection *mongo.Collection
+var db *sql.DB
 
 func init() {
-	// Set client options
-	clientOptions := options.Client().ApplyURI("mongodb://mongodb:27017")
-
-	// Connect to MongoDB
 	var err error
-	client, err = mongo.Connect(context.TODO(), clientOptions)
+	db, err = sql.Open("sqlite3", "./dfs.db")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	// Check the connection
-	err = client.Ping(context.TODO(), nil)
+	// Create chunks table if it doesn't exist
+	createTableSQL := `CREATE TABLE IF NOT EXISTS chunks (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        chunkID TEXT NOT NULL,
+        chunkData BLOB NOT NULL
+    );`
+	_, err = db.Exec(createTableSQL)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	fmt.Println("Connected to MongoDB!")
-
-	// Get a handle for the chunks collection
-	chunksCollection = client.Database("dfs").Collection("chunks")
+	log.Println("Connected to SQLite and ensured chunks table exists!")
 }
 
 func storeChunkInDB(chunkID string, chunkData []byte) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
+	insertChunkSQL := `INSERT INTO chunks (chunkID, chunkData) VALUES (?, ?)`
+	stmt, err := db.Prepare(insertChunkSQL)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
 
-	_, err := chunksCollection.InsertOne(ctx, map[string]interface{}{
-		"chunkID":   chunkID,
-		"chunkData": chunkData,
-	})
+	_, err = stmt.Exec(chunkID, chunkData)
 	return err
 }
