@@ -28,6 +28,7 @@ Store file chunks, serve master node requests.
 
 - [ ] come up with a better name for the project
 - [ ] add a config file for parameters such as chunk size and how much storage worker nodes have
+- [ ] check if Dockerfile is doing only the needed work
 - [ ] proper logging
 - [ ] testing
 - [ ] maybe automated testing of the database?
