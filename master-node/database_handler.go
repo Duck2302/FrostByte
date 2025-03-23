@@ -6,6 +6,7 @@ import (
 	"log"
 	"time"
 
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -32,7 +33,7 @@ func init() {
 
 	fmt.Println("Connected to MongoDB!")
 
-	// Get a handle for the chunks collection
+	// Get a handle for the files collection
 	filesCollection = client.Database("dfs").Collection("files")
 }
 
@@ -40,10 +41,13 @@ func storeChunkInDB(filename string, chunkID string, workerID string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	_, err := filesCollection.InsertOne(ctx, map[string]interface{}{
-		"filename": filename,
-		"chunkID":  chunkID,
-		"workerID": workerID,
-	})
+	// Update the document for the file, adding the chunk information
+	update := bson.M{
+		"$push": bson.M{
+			fmt.Sprintf("workers.%s", workerID): chunkID,
+		},
+	}
+
+	_, err := filesCollection.UpdateOne(ctx, bson.M{"filename": filename}, update, options.Update().SetUpsert(true))
 	return err
 }
