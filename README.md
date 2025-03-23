@@ -22,6 +22,7 @@ Store file chunks, serve master node requests.
 - [ ] maybe make master node keep track of worker nodes storage capacity
 - [ ] implement check for available space in workers before distributing chunks (do workers or master keep track?)
 - [ ] add endpoint for retrieving files to master node (load chunks from all the nodes and put the original file back together)
+- [ ] add endpoint for deleting files to master node (delete chunks from all the nodes)
 
 ## Later:
 
