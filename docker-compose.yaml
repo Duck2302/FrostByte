@@ -10,8 +10,17 @@ services:
     image: worker-node
     deploy:
       replicas: 5
+    restart: always
     depends_on:
       - master
+      - mongodb
+    networks:
+      - dfs-network
+
+  mongodb:
+    image: mongo:latest
+    ports:
+      - "27017:27017"
     networks:
       - dfs-network
 
