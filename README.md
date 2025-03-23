@@ -32,6 +32,7 @@ Store file chunks, serve master node requests.
 - [ ] maybe automated testing of the database?
 - [ ] documentation
 - [ ] better strategy for distributing chunks (total pool and distributed by percentage of free storage)
+- [ ] add redunancy to each chunk
 - [ ] sqlite config to set maximum possible database size (and check if other limits could be reached)
 - [ ] add health check to worker nodes (so workers get deleted from master node dict if they are down)
 - [ ] implement recovery strategy
