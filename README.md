@@ -18,7 +18,7 @@ Store file chunks, serve master node requests.
 - [X] add store endpoint to worker nodes (store in database)
 - [X] change storage location to sqlite databases
 - [X] add upload endpoint to master node (distribute to worker nodes and keep ids of which blocks are where)
-- [ ] more efficient and easier to use database schema
+- [X] more efficient and easier to use database schema
 - [ ] maybe make master node keep track of worker nodes storage capacity
 - [ ] implement check for available space in workers before distributing chunks (do workers or master keep track?)
 - [ ] add endpoint for retrieving files to master node (load chunks from all the nodes and put the original file back together)
