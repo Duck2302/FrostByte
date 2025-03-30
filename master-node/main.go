@@ -1,12 +1,16 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"sync"
+	"time"
+
+	"go.mongodb.org/mongo-driver/bson"
 )
 
 type Worker struct {
@@ -88,11 +92,61 @@ func uploadFile(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func downloadFile(w http.ResponseWriter, r *http.Request) {
+	filename := r.URL.Query().Get("filename")
+	if filename == "" {
+		http.Error(w, "Filename is required", http.StatusBadRequest)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Retrieve the file metadata from the database
+	var fileMetadata struct {
+		Chunks map[string][]string `bson:"chunks"`
+	}
+	err := filesCollection.FindOne(ctx, bson.M{"filename": filename}).Decode(&fileMetadata)
+	if err != nil {
+		http.Error(w, "Failed to retrieve file metadata", http.StatusInternalServerError)
+		return
+	}
+
+	// Set headers for file download
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", filename))
+	w.Header().Set("Content-Type", "application/octet-stream")
+
+	// Stream the file chunks to the response
+	for chunkID, workerIDs := range fileMetadata.Chunks {
+		var chunkData []byte
+		for _, workerID := range workerIDs {
+			chunkData, err = fetchChunkFromWorker(workerID, chunkID)
+			if err == nil {
+				break // Successfully fetched the chunk
+			}
+			log.Printf("Failed to fetch chunk %s from worker %s: %v", chunkID, workerID, err)
+		}
+
+		if err != nil {
+			http.Error(w, fmt.Sprintf("Failed to fetch chunk %s from all workers", chunkID), http.StatusInternalServerError)
+			return
+		}
+
+		// Write the chunk data directly to the response
+		_, err = w.Write(chunkData)
+		if err != nil {
+			log.Printf("Failed to write chunk %s to response: %v", chunkID, err)
+			return
+		}
+	}
+}
+
 func main() {
 	http.HandleFunc("/register", registerWorker)
 	http.HandleFunc("/workers", listWorkers)
 	http.HandleFunc("/test", testWorker)
 	http.HandleFunc("/upload", uploadFile)
+	http.HandleFunc("/download", downloadFile)
 
 	fmt.Println("Master node listening on :8080")
 	http.ListenAndServe(":8080", nil)

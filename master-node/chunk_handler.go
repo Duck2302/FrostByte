@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"net/http"
 
 	"github.com/google/uuid"
@@ -28,4 +29,19 @@ func sendChunkToWorker(filename string, workerID string, chunkData []byte) error
 
 	fmt.Printf("Chunk %s sent to worker %s\n", chunkUUID, workerID)
 	return nil
+}
+
+func fetchChunkFromWorker(workerID, chunkID string) ([]byte, error) {
+	// Fetch the chunk from the worker node
+	resp, err := http.Get(fmt.Sprintf("http://%s:8081/get?chunkID=%s", workerID, chunkID))
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to fetch chunk: %s", resp.Status)
+	}
+
+	return io.ReadAll(resp.Body)
 }

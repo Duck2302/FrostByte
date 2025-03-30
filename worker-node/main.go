@@ -44,6 +44,27 @@ func storeChunk(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "Chunk %s stored successfully", chunkID)
 }
 
+func getChunk(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "GET" {
+		http.Error(w, "store endpoint only accepts GET requests", http.StatusMethodNotAllowed)
+		return
+	}
+	chunkID := r.URL.Query().Get("chunkID")
+
+	chunkData, err := getChunkFromDB(chunkID)
+	if err != nil {
+		http.Error(w, "Failed to store chunk in database", http.StatusInternalServerError)
+		return
+	}
+
+	log.Printf("Chunk %s retrieved successfully", chunkID)
+	w.Header().Set("Content-Type", "application/octet-stream")
+	_, err = w.Write(chunkData)
+	if err != nil {
+		log.Println("Failed to write chunk data")
+	}
+}
+
 func main() {
 	registerWithMaster()
 
@@ -52,6 +73,6 @@ func main() {
 	})
 
 	http.HandleFunc("/store", storeChunk)
-
+	http.HandleFunc("/get", getChunk)
 	http.ListenAndServe(":8081", nil)
 }

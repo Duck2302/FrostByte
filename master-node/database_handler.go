@@ -41,13 +41,14 @@ func storeChunkInDB(filename string, chunkID string, workerID string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	// Update the document for the file, adding the chunk information
+	// Update the document for the file, adding the workerID to the list of workers for the chunkID
 	update := bson.M{
-		"$push": bson.M{
-			fmt.Sprintf("workers.%s", workerID): chunkID,
+		"$addToSet": bson.M{
+			fmt.Sprintf("chunks.%s", chunkID): workerID,
 		},
 	}
 
+	// Ensure the document exists and update it
 	_, err := filesCollection.UpdateOne(ctx, bson.M{"filename": filename}, update, options.Update().SetUpsert(true))
 	return err
 }
