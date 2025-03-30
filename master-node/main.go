@@ -9,8 +9,6 @@ import (
 	"net/http"
 	"sync"
 	"time"
-
-	"go.mongodb.org/mongo-driver/bson"
 )
 
 type Worker struct {
@@ -102,11 +100,8 @@ func downloadFile(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	// Retrieve the file metadata from the database
-	var fileMetadata struct {
-		Chunks map[string][]string `bson:"chunks"`
-	}
-	err := filesCollection.FindOne(ctx, bson.M{"filename": filename}).Decode(&fileMetadata)
+	// Retrieve the file metadata using the database handler
+	fileChunks, err := GetFileMetadata(ctx, filename)
 	if err != nil {
 		http.Error(w, "Failed to retrieve file metadata", http.StatusInternalServerError)
 		return
@@ -117,7 +112,7 @@ func downloadFile(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/octet-stream")
 
 	// Stream the file chunks to the response
-	for chunkID, workerIDs := range fileMetadata.Chunks {
+	for chunkID, workerIDs := range fileChunks {
 		var chunkData []byte
 		for _, workerID := range workerIDs {
 			chunkData, err = fetchChunkFromWorker(workerID, chunkID)
@@ -151,18 +146,15 @@ func deleteFile(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	// Retrieve the file metadata from the database
-	var fileMetadata struct {
-		Chunks map[string][]string `bson:"chunks"`
-	}
-	err := filesCollection.FindOne(ctx, bson.M{"filename": filename}).Decode(&fileMetadata)
+	// Retrieve the file metadata using the database handler
+	fileChunks, err := GetFileMetadata(ctx, filename)
 	if err != nil {
 		http.Error(w, "Failed to retrieve file metadata", http.StatusInternalServerError)
 		return
 	}
 
-	// Stream the file chunks to the response
-	for chunkID, workerIDs := range fileMetadata.Chunks {
+	// Delete the file chunks from workers
+	for chunkID, workerIDs := range fileChunks {
 		for _, workerID := range workerIDs {
 			err = deleteChunkFromWorker(workerID, chunkID)
 			if err == nil {
@@ -175,18 +167,15 @@ func deleteFile(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, fmt.Sprintf("Failed to delete chunk %s from all workers", chunkID), http.StatusInternalServerError)
 			return
 		}
-
-		log.Printf("deleted all chunks of the file:%s", filename)
+		log.Printf("Deleted all chunks of the file: %s", filename)
 	}
 
-	// Delete the file metadata from the database
-	_, err = filesCollection.DeleteOne(ctx, bson.M{"filename": filename})
+	// Delete the file metadata using the database handler
+	err = DeleteFileMetadata(ctx, filename)
 	if err != nil {
 		http.Error(w, "Failed to delete file metadata", http.StatusInternalServerError)
 		return
 	}
-
-	log.Printf("File metadata deleted for file:%s", filename)
 }
 
 func main() {

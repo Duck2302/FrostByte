@@ -52,3 +52,25 @@ func storeChunkInDB(filename string, chunkID string, workerID string) error {
 	_, err := filesCollection.UpdateOne(ctx, bson.M{"filename": filename}, update, options.Update().SetUpsert(true))
 	return err
 }
+
+// Retrieve file metadata from the database
+func GetFileMetadata(ctx context.Context, filename string) (map[string][]string, error) {
+	var fileMetadata struct {
+		Chunks map[string][]string `bson:"chunks"`
+	}
+	err := filesCollection.FindOne(ctx, bson.M{"filename": filename}).Decode(&fileMetadata)
+	if err != nil {
+		return nil, err
+	}
+	return fileMetadata.Chunks, nil
+}
+
+// Delete file metadata from the database
+func DeleteFileMetadata(ctx context.Context, filename string) error {
+	_, err := filesCollection.DeleteOne(ctx, bson.M{"filename": filename})
+	if err != nil {
+		return err
+	}
+	log.Printf("File metadata deleted for file: %s", filename)
+	return nil
+}
