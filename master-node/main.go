@@ -141,12 +141,61 @@ func downloadFile(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func deleteFile(w http.ResponseWriter, r *http.Request) {
+	filename := r.URL.Query().Get("filename")
+	if filename == "" {
+		http.Error(w, "Filename is required", http.StatusBadRequest)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Retrieve the file metadata from the database
+	var fileMetadata struct {
+		Chunks map[string][]string `bson:"chunks"`
+	}
+	err := filesCollection.FindOne(ctx, bson.M{"filename": filename}).Decode(&fileMetadata)
+	if err != nil {
+		http.Error(w, "Failed to retrieve file metadata", http.StatusInternalServerError)
+		return
+	}
+
+	// Stream the file chunks to the response
+	for chunkID, workerIDs := range fileMetadata.Chunks {
+		for _, workerID := range workerIDs {
+			err = deleteChunkFromWorker(workerID, chunkID)
+			if err == nil {
+				break // Successfully deleted the chunk
+			}
+			log.Printf("Failed to delete chunk %s from worker %s: %v", chunkID, workerID, err)
+		}
+
+		if err != nil {
+			http.Error(w, fmt.Sprintf("Failed to delete chunk %s from all workers", chunkID), http.StatusInternalServerError)
+			return
+		}
+
+		log.Printf("deleted all chunks of the file:%s", filename)
+	}
+
+	// Delete the file metadata from the database
+	_, err = filesCollection.DeleteOne(ctx, bson.M{"filename": filename})
+	if err != nil {
+		http.Error(w, "Failed to delete file metadata", http.StatusInternalServerError)
+		return
+	}
+
+	log.Printf("File metadata deleted for file:%s", filename)
+}
+
 func main() {
 	http.HandleFunc("/register", registerWorker)
 	http.HandleFunc("/workers", listWorkers)
 	http.HandleFunc("/test", testWorker)
 	http.HandleFunc("/upload", uploadFile)
 	http.HandleFunc("/download", downloadFile)
+	http.HandleFunc("/delete", deleteFile)
 
 	fmt.Println("Master node listening on :8080")
 	http.ListenAndServe(":8080", nil)

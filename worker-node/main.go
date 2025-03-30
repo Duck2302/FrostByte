@@ -63,6 +63,25 @@ func getChunk(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Println("Failed to write chunk data")
 	}
+	log.Printf("Chunk %s successfully retrieved from database", chunkID)
+	fmt.Fprintf(w, "Chunk %s successfully retrieved from database", chunkID)
+}
+
+func deleteFile(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "DELETE" {
+		http.Error(w, "store endpoint only accepts DELETE requests", http.StatusMethodNotAllowed)
+		return
+	}
+	chunkID := r.URL.Query().Get("chunkID")
+
+	err := deleteChunkFromDB(chunkID)
+	if err != nil {
+		log.Println(err)
+		http.Error(w, "Failed to delete chunk from database", http.StatusInternalServerError)
+		return
+	}
+	log.Printf("Chunk %s deleted successfully from database", chunkID)
+	fmt.Fprintf(w, "Chunk %s successfully deleted from database", chunkID)
 }
 
 func main() {
@@ -74,5 +93,6 @@ func main() {
 
 	http.HandleFunc("/store", storeChunk)
 	http.HandleFunc("/get", getChunk)
+	http.HandleFunc("/delete", deleteFile)
 	http.ListenAndServe(":8081", nil)
 }

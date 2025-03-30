@@ -69,3 +69,19 @@ func getChunkFromDB(chunkID string) ([]byte, error) {
 
 	return chunkData, nil
 }
+
+func deleteChunkFromDB(chunkID string) error {
+	deleteSQL := `DELETE FROM chunks WHERE chunkID = ?`
+	stmt, err := db.Prepare(deleteSQL)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	_, err = stmt.Exec(chunkID)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}

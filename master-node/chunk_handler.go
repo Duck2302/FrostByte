@@ -45,3 +45,24 @@ func fetchChunkFromWorker(workerID, chunkID string) ([]byte, error) {
 
 	return io.ReadAll(resp.Body)
 }
+
+func deleteChunkFromWorker(workerID, chunkID string) error {
+	// Create a new DELETE request
+	req, err := http.NewRequest("DELETE", fmt.Sprintf("http://%s:8081/delete?chunkID=%s", workerID, chunkID), nil)
+	if err != nil {
+		return err
+	}
+
+	// Send the request
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("failed to delete chunk: %s", resp.Status)
+	}
+
+	return nil
+}
