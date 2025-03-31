@@ -19,8 +19,7 @@ func init() {
 
 	// Create chunks table if it doesn't exist
 	createTableSQL := `CREATE TABLE IF NOT EXISTS chunks (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        chunkID TEXT NOT NULL,
+        chunkID TEXT PRIMARY KEY NOT NULL,
         chunkData BLOB NOT NULL
     );`
 	_, err = db.Exec(createTableSQL)
