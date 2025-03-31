@@ -23,7 +23,14 @@ services:
       - "27017:27017"
     networks:
       - dfs-network
+    volumes:
+      - mongo_data:/data/db
+      - mongo_config:/data/configdb
 
 
 networks:
   dfs-network:
+
+volumes:
+ mongo_data:
+ mongo_config:
