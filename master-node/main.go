@@ -178,6 +178,22 @@ func deleteFile(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func listFiles(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	filenames, err := GetAllFilenames(ctx)
+	if err != nil {
+		log.Printf("Failed to retrieve file metadata from database: %v\n", err)
+		http.Error(w, "Failed to retrieve file metadata", http.StatusInternalServerError)
+		return
+	}
+	json.NewEncoder(w).Encode(filenames)
+}
+
 func main() {
 	http.HandleFunc("/register", registerWorker)
 	http.HandleFunc("/workers", listWorkers)
@@ -185,6 +201,7 @@ func main() {
 	http.HandleFunc("/upload", uploadFile)
 	http.HandleFunc("/download", downloadFile)
 	http.HandleFunc("/delete", deleteFile)
+	http.HandleFunc("/files", listFiles)
 
 	fmt.Println("Master node listening on :8080")
 	http.ListenAndServe(":8080", nil)
