@@ -29,6 +29,7 @@ func registerWorker(w http.ResponseWriter, r *http.Request) {
 	workers[id] = Worker{ID: id}
 	mu.Unlock()
 
+	log.Printf("Worker %s registered from %s", id, addr)
 	fmt.Fprintf(w, "Worker %s registered from %s\n", id, addr)
 }
 
@@ -37,7 +38,11 @@ func listWorkers(w http.ResponseWriter, r *http.Request) {
 	defer mu.Unlock()
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(workers)
+	err := json.NewEncoder(w).Encode(workers)
+	if err != nil {
+		log.Printf("Failed to encode workers list: %v", err)
+		http.Error(w, "Failed to encode workers list", http.StatusInternalServerError)
+	}
 }
 
 func testWorker(w http.ResponseWriter, r *http.Request) {
@@ -48,12 +53,14 @@ func testWorker(w http.ResponseWriter, r *http.Request) {
 	mu.Unlock()
 
 	if !exists {
+		log.Printf("Worker %s not found", id)
 		http.Error(w, "Worker not found", http.StatusNotFound)
 		return
 	}
 
 	resp, err := http.Get(fmt.Sprintf("http://%s:8081/worker-test", worker.ID))
 	if err != nil {
+		log.Printf("Failed to reach worker %s: %v", id, err)
 		http.Error(w, "Failed to reach worker", http.StatusInternalServerError)
 		return
 	}
@@ -66,33 +73,36 @@ func testWorker(w http.ResponseWriter, r *http.Request) {
 func uploadFile(w http.ResponseWriter, r *http.Request) {
 	filename := r.URL.Query().Get("filename")
 	if filename == "" {
+		log.Println("Filename is required")
 		http.Error(w, "Filename is required", http.StatusBadRequest)
 		return
 	}
 
 	fileData, err := io.ReadAll(r.Body)
 	if err != nil {
+		log.Printf("Failed to read file data: %v", err)
 		http.Error(w, "Failed to read file data", http.StatusInternalServerError)
 		return
 	}
 
 	chunks := splitFile(fileData, 64*1024*1024) // Split file into MiB sized chunks
 	for _, chunk := range chunks {
-
 		workerID := selectWorker(workers)
 
 		err := sendChunkToWorker(filename, workerID, chunk)
 		if err != nil {
+			log.Printf("Failed to send chunk to worker %s: %v", workerID, err)
 			http.Error(w, "Failed to send chunk to worker", http.StatusInternalServerError)
 			return
 		}
-
+		log.Printf("Chunk sent to worker %s for file %s", workerID, filename)
 	}
 }
 
 func downloadFile(w http.ResponseWriter, r *http.Request) {
 	filename := r.URL.Query().Get("filename")
 	if filename == "" {
+		log.Println("Filename is required")
 		http.Error(w, "Filename is required", http.StatusBadRequest)
 		return
 	}
@@ -100,45 +110,45 @@ func downloadFile(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	// Retrieve the file metadata using the database handler
 	fileChunks, err := GetFileMetadata(ctx, filename)
 	if err != nil {
+		log.Printf("Failed to retrieve file metadata for %s: %v", filename, err)
 		http.Error(w, "Failed to retrieve file metadata", http.StatusInternalServerError)
 		return
 	}
 
-	// Set headers for file download
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", filename))
 	w.Header().Set("Content-Type", "application/octet-stream")
 
-	// Stream the file chunks to the response
 	for chunkID, workerIDs := range fileChunks {
 		var chunkData []byte
 		for _, workerID := range workerIDs {
 			chunkData, err = fetchChunkFromWorker(workerID, chunkID)
 			if err == nil {
-				break // Successfully fetched the chunk
+				break
 			}
 			log.Printf("Failed to fetch chunk %s from worker %s: %v", chunkID, workerID, err)
 		}
 
 		if err != nil {
+			log.Printf("Failed to fetch chunk %s from all workers: %v", chunkID, err)
 			http.Error(w, fmt.Sprintf("Failed to fetch chunk %s from all workers", chunkID), http.StatusInternalServerError)
 			return
 		}
 
-		// Write the chunk data directly to the response
 		_, err = w.Write(chunkData)
 		if err != nil {
 			log.Printf("Failed to write chunk %s to response: %v", chunkID, err)
 			return
 		}
+		log.Printf("Chunk %s written to response", chunkID)
 	}
 }
 
 func deleteFile(w http.ResponseWriter, r *http.Request) {
 	filename := r.URL.Query().Get("filename")
 	if filename == "" {
+		log.Println("Filename is required")
 		http.Error(w, "Filename is required", http.StatusBadRequest)
 		return
 	}
@@ -146,52 +156,62 @@ func deleteFile(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	// Retrieve the file metadata using the database handler
 	fileChunks, err := GetFileMetadata(ctx, filename)
 	if err != nil {
+		log.Printf("Failed to retrieve file metadata for %s: %v", filename, err)
 		http.Error(w, "Failed to retrieve file metadata", http.StatusInternalServerError)
 		return
 	}
 
-	// Delete the file chunks from workers
 	for chunkID, workerIDs := range fileChunks {
 		for _, workerID := range workerIDs {
 			err = deleteChunkFromWorker(workerID, chunkID)
 			if err == nil {
-				break // Successfully deleted the chunk
+				break
 			}
 			log.Printf("Failed to delete chunk %s from worker %s: %v", chunkID, workerID, err)
 		}
 
 		if err != nil {
+			log.Printf("Failed to delete chunk %s from all workers: %v", chunkID, err)
 			http.Error(w, fmt.Sprintf("Failed to delete chunk %s from all workers", chunkID), http.StatusInternalServerError)
 			return
 		}
-		log.Printf("Deleted all chunks of the file: %s", filename)
+		log.Printf("Deleted chunk %s for file %s", chunkID, filename)
 	}
 
-	// Delete the file metadata using the database handler
 	err = DeleteFileMetadata(ctx, filename)
 	if err != nil {
+		log.Printf("Failed to delete file metadata for %s: %v", filename, err)
 		http.Error(w, "Failed to delete file metadata", http.StatusInternalServerError)
 		return
 	}
+	log.Printf("Deleted file metadata for %s", filename)
 }
 
 func listFiles(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
+		log.Println("Method not allowed for listing files")
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+
 	filenames, err := GetAllFilenames(ctx)
 	if err != nil {
-		log.Printf("Failed to retrieve file metadata from database: %v\n", err)
+		log.Printf("Failed to retrieve file metadata from database: %v", err)
 		http.Error(w, "Failed to retrieve file metadata", http.StatusInternalServerError)
 		return
 	}
-	json.NewEncoder(w).Encode(filenames)
+
+	err = json.NewEncoder(w).Encode(filenames)
+	if err != nil {
+		log.Printf("Failed to encode filenames: %v", err)
+		http.Error(w, "Failed to encode filenames", http.StatusInternalServerError)
+	}
+	log.Println("File list successfully retrieved")
 }
 
 func main() {
