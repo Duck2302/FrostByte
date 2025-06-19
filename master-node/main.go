@@ -73,30 +73,68 @@ func testWorker(w http.ResponseWriter, r *http.Request) {
 func uploadFile(w http.ResponseWriter, r *http.Request) {
 	filename := r.URL.Query().Get("filename")
 	if filename == "" {
-		log.Println("Filename is required")
-		http.Error(w, "Filename is required", http.StatusBadRequest)
+		http.Error(w, "Filename parameter is required", http.StatusBadRequest)
 		return
 	}
 
 	fileData, err := io.ReadAll(r.Body)
 	if err != nil {
-		log.Printf("Failed to read file data: %v", err)
-		http.Error(w, "Failed to read file data", http.StatusInternalServerError)
+		http.Error(w, "Error reading file data", http.StatusInternalServerError)
 		return
 	}
 
 	chunks := splitFile(fileData, 64*1024*1024) // Split file into 64MiB sized chunks
-	for _, chunk := range chunks {
-		workerID := selectWorker(workers)
 
-		err := sendChunkToWorker(filename, workerID, chunk)
-		if err != nil {
-			log.Printf("Failed to send chunk to worker %s: %v", workerID, err)
-			http.Error(w, "Failed to send chunk to worker", http.StatusInternalServerError)
-			return
-		}
-		log.Printf("Chunk sent to worker %s for file %s", workerID, filename)
+	// Parallelize chunk storage
+	var wg sync.WaitGroup
+	errors := make(chan error, len(chunks))
+	semaphore := make(chan struct{}, 5) // Limit concurrent uploads to 5
+
+	for _, chunk := range chunks {
+		wg.Add(1)
+		go func(chunkData []byte) {
+			defer wg.Done()
+
+			// Acquire semaphore
+			semaphore <- struct{}{}
+			defer func() { <-semaphore }()
+
+			// Select a worker using your existing function
+			mu.Lock()
+			workerID := selectWorker(workers)
+			mu.Unlock()
+
+			if workerID == "" {
+				errors <- fmt.Errorf("no available workers")
+				return
+			}
+
+			// Send chunk to worker
+			err := sendChunkToWorker(filename, workerID, chunkData)
+			if err != nil {
+				errors <- fmt.Errorf("failed to send chunk to worker %s: %v", workerID, err)
+				return
+			}
+		}(chunk)
 	}
+
+	// Wait for all goroutines to complete
+	wg.Wait()
+	close(errors)
+
+	// Check for any errors
+	var uploadErrors []string
+	for err := range errors {
+		uploadErrors = append(uploadErrors, err.Error())
+	}
+
+	if len(uploadErrors) > 0 {
+		http.Error(w, fmt.Sprintf("Upload failed: %v", uploadErrors), http.StatusInternalServerError)
+		return
+	}
+
+	log.Printf("File %s uploaded successfully with %d chunks", filename, len(chunks))
+	fmt.Fprintf(w, "File %s uploaded successfully with %d chunks", filename, len(chunks))
 }
 
 func downloadFile(w http.ResponseWriter, r *http.Request) {
