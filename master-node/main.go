@@ -85,7 +85,7 @@ func uploadFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	chunks := splitFile(fileData, 64*1024*1024) // Split file into MiB sized chunks
+	chunks := splitFile(fileData, 64*1024*1024) // Split file into 64MiB sized chunks
 	for _, chunk := range chunks {
 		workerID := selectWorker(workers)
 
