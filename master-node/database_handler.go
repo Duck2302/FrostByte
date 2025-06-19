@@ -74,3 +74,33 @@ func DeleteFileMetadata(ctx context.Context, filename string) error {
 	log.Printf("File metadata deleted for file: %s", filename)
 	return nil
 }
+
+// GetAllFilenames retrieves a list of all filenames in the database
+func GetAllFilenames(ctx context.Context) ([]string, error) {
+	var filenames []string
+
+	// Find all documents in the collection
+	cursor, err := filesCollection.Find(ctx, bson.M{})
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	// Iterate through the cursor and extract filenames
+	for cursor.Next(ctx) {
+		var file struct {
+			Filename string `bson:"filename"`
+		}
+		if err := cursor.Decode(&file); err != nil {
+			return nil, err
+		}
+		filenames = append(filenames, file.Filename)
+	}
+
+	// Check for any errors during iteration
+	if err := cursor.Err(); err != nil {
+		return nil, err
+	}
+
+	return filenames, nil
+}

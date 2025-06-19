@@ -4,7 +4,7 @@ services:
     ports:
       - "8080:8080"
     networks:
-      - dfs-network
+      - FrostByte_network
 
   worker:
     image: worker-node
@@ -15,15 +15,22 @@ services:
       - master
       - mongodb
     networks:
-      - dfs-network
+      - FrostByte_network
 
   mongodb:
-    image: mongo:latest
+    image: mongo:8.0.6
     ports:
       - "27017:27017"
     networks:
-      - dfs-network
+      - FrostByte_network
+    volumes:
+      - mongo_data:/data/db
+      - mongo_config:/data/configdb
 
 
 networks:
-  dfs-network:
+  FrostByte_network:
+
+volumes:
+ mongo_data:
+ mongo_config:

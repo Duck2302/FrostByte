@@ -2,7 +2,6 @@ package main
 
 import (
 	"database/sql"
-	"errors"
 	"log"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -19,8 +18,7 @@ func init() {
 
 	// Create chunks table if it doesn't exist
 	createTableSQL := `CREATE TABLE IF NOT EXISTS chunks (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        chunkID TEXT NOT NULL,
+        chunkID TEXT PRIMARY KEY NOT NULL,
         chunkData BLOB NOT NULL
     );`
 	_, err = db.Exec(createTableSQL)
@@ -33,37 +31,23 @@ func init() {
 
 func storeChunkInDB(chunkID string, chunkData []byte) error {
 	insertChunkSQL := `INSERT INTO chunks (chunkID, chunkData) VALUES (?, ?)`
-	stmt, err := db.Prepare(insertChunkSQL)
+	_, err := db.Exec(insertChunkSQL, chunkID, chunkData)
 	if err != nil {
 		return err
 	}
-	defer stmt.Close()
 
-	_, err = stmt.Exec(chunkID, chunkData)
 	return err
 }
 
 func getChunkFromDB(chunkID string) ([]byte, error) {
-	getChunkSQL := `SELECT chunkData FROM chunks WHERE chunkID =?`
-	stmt, err := db.Prepare(getChunkSQL)
-	if err != nil {
-		return nil, err
-	}
-	defer stmt.Close()
-
-	rows, err := stmt.Query(chunkID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	if !rows.Next() {
-		return nil, errors.New("no rows found")
-	}
-
+	getChunkSQL := `SELECT chunkData FROM chunks WHERE chunkID = ?`
 	var chunkData []byte
-	err = rows.Scan(&chunkData)
+
+	err := db.QueryRow(getChunkSQL, chunkID).Scan(&chunkData)
 	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
 		return nil, err
 	}
 
@@ -72,13 +56,7 @@ func getChunkFromDB(chunkID string) ([]byte, error) {
 
 func deleteChunkFromDB(chunkID string) error {
 	deleteSQL := `DELETE FROM chunks WHERE chunkID = ?`
-	stmt, err := db.Prepare(deleteSQL)
-	if err != nil {
-		return err
-	}
-	defer stmt.Close()
-
-	_, err = stmt.Exec(chunkID)
+	_, err := db.Exec(deleteSQL, chunkID)
 	if err != nil {
 		return err
 	}
