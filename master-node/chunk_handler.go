@@ -6,17 +6,18 @@ import (
 	"io"
 	"log"
 	"net/http"
-
-	"github.com/google/uuid"
+	"strings"
 )
 
-func generateChunkUUID() string {
-	return uuid.NewString()
+func generateChunkID(filename string, chunkIndex int) string {
+	// Replace dots with underscores to avoid MongoDB field name issues
+	safeFilename := strings.ReplaceAll(filename, ".", "_")
+	return fmt.Sprintf("%s_chunk_%04d", safeFilename, chunkIndex)
 }
 
-func sendChunkToWorker(filename string, workerID string, chunkData []byte) error {
-	chunkUUID := generateChunkUUID()
-	resp, err := http.Post(fmt.Sprintf("http://%s:8081/store?chunkID=%s", workerID, chunkUUID), "application/octet-stream", bytes.NewReader(chunkData))
+func sendChunkToWorker(filename string, workerID string, chunkData []byte, chunkIndex int) error {
+	chunkID := generateChunkID(filename, chunkIndex)
+	resp, err := http.Post(fmt.Sprintf("http://%s:8081/store?chunkID=%s", workerID, chunkID), "application/octet-stream", bytes.NewReader(chunkData))
 	if err != nil {
 		log.Printf("Failed to send chunk to worker %s: %v", workerID, err)
 		return fmt.Errorf("failed to send chunk to worker %s: %v", workerID, err)
@@ -29,13 +30,13 @@ func sendChunkToWorker(filename string, workerID string, chunkData []byte) error
 	}
 
 	// Store the chunk information in the database
-	err = storeChunkInDB(filename, chunkUUID, workerID)
+	err = storeChunkInDB(filename, chunkID, workerID)
 	if err != nil {
 		log.Printf("Failed to store chunk in database: %v", err)
 		return fmt.Errorf("failed to store chunk in database: %v", err)
 	}
 
-	log.Printf("Chunk %s sent to worker %s", chunkUUID, workerID)
+	log.Printf("Chunk %s sent to worker %s", chunkID, workerID)
 	return nil
 }
 

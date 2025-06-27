@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"sort"
 	"sync"
 	"time"
 )
@@ -90,9 +91,9 @@ func uploadFile(w http.ResponseWriter, r *http.Request) {
 	errors := make(chan error, len(chunks))
 	semaphore := make(chan struct{}, 5) // Limit concurrent uploads to 5
 
-	for _, chunk := range chunks {
+	for i, chunk := range chunks {
 		wg.Add(1)
-		go func(chunkData []byte) {
+		go func(chunkData []byte, chunkIndex int) {
 			defer wg.Done()
 
 			// Acquire semaphore
@@ -109,13 +110,13 @@ func uploadFile(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
-			// Send chunk to worker
-			err := sendChunkToWorker(filename, workerID, chunkData)
+			// Send chunk to worker with index
+			err := sendChunkToWorker(filename, workerID, chunkData, chunkIndex)
 			if err != nil {
 				errors <- fmt.Errorf("failed to send chunk to worker %s: %v", workerID, err)
 				return
 			}
-		}(chunk)
+		}(chunk, i)
 	}
 
 	// Wait for all goroutines to complete
@@ -155,10 +156,18 @@ func downloadFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Sort chunk IDs to ensure correct order
+	var chunkIDs []string
+	for chunkID := range fileChunks {
+		chunkIDs = append(chunkIDs, chunkID)
+	}
+	sort.Strings(chunkIDs) // This works because of the sequential naming format
+
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", filename))
 	w.Header().Set("Content-Type", "application/octet-stream")
 
-	for chunkID, workerIDs := range fileChunks {
+	for _, chunkID := range chunkIDs {
+		workerIDs := fileChunks[chunkID]
 		var chunkData []byte
 		for _, workerID := range workerIDs {
 			chunkData, err = fetchChunkFromWorker(workerID, chunkID)
