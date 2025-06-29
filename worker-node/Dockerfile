@@ -12,7 +12,7 @@ RUN go mod download
 # Copy the rest of the source code
 COPY . .
 
-RUN CGO_ENABLED=1 go build -o main main.go database_handler.go
+RUN CGO_ENABLED=1 go build -o main .
 
 # Stage 2: Runtime
 FROM debian:bookworm-slim

@@ -13,10 +13,13 @@ RUN go mod download
 COPY . .
 
 # Build the application
-RUN CGO_ENABLED=1 go build -o main main.go worker_handler.go file_handler.go chunk_handler.go database_handler.go
+RUN CGO_ENABLED=1 go build -o main .
 
 # Stage 2: Runtime
 FROM debian:bookworm-slim
+
+# Install curl for health checks
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 

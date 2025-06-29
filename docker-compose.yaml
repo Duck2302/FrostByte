@@ -1,22 +1,4 @@
 services:
-  master:
-    image: master-node
-    ports:
-      - "8080:8080"
-    networks:
-      - FrostByte_network
-
-  worker:
-    image: worker-node
-    deploy:
-      replicas: 5
-    restart: always
-    depends_on:
-      - master
-      - mongodb
-    networks:
-      - FrostByte_network
-
   mongodb:
     image: mongo:8.0.6
     ports:
@@ -26,6 +8,38 @@ services:
     volumes:
       - mongo_data:/data/db
       - mongo_config:/data/configdb
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  master:
+    image: master-node
+    ports:
+      - "8080:8080"
+    networks:
+      - FrostByte_network
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  worker:
+    image: worker-node
+    deploy:
+      replicas: 5
+    restart: unless-stopped
+    depends_on:
+      master:
+        condition: service_healthy
+    networks:
+      - FrostByte_network
 
 
 networks:

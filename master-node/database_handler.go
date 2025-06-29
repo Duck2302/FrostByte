@@ -18,19 +18,38 @@ func init() {
 	// Set client options
 	clientOptions := options.Client().ApplyURI("mongodb://mongodb:27017")
 
-	// Connect to MongoDB
-	var err error
-	client, err = mongo.Connect(context.TODO(), clientOptions)
-	if err != nil {
-		log.Fatal(err)
-	}
+	// Connect to MongoDB with retry logic
+	maxRetries := 10
+	retryDelay := 2 * time.Second
 
-	// Check the connection
-	err = client.Ping(context.TODO(), nil)
-	if err != nil {
-		log.Fatal(err)
+	var err error
+	for attempt := 1; attempt <= maxRetries; attempt++ {
+		log.Printf("Attempting to connect to MongoDB (attempt %d/%d)...", attempt, maxRetries)
+
+		client, err = mongo.Connect(context.TODO(), clientOptions)
+		if err != nil {
+			log.Printf("Failed to connect to MongoDB (attempt %d): %v", attempt, err)
+			if attempt < maxRetries {
+				time.Sleep(retryDelay)
+				continue
+			}
+			log.Fatalf("Failed to connect to MongoDB after %d attempts: %v", maxRetries, err)
+		}
+
+		// Check the connection
+		err = client.Ping(context.TODO(), nil)
+		if err != nil {
+			log.Printf("Failed to ping MongoDB (attempt %d): %v", attempt, err)
+			if attempt < maxRetries {
+				time.Sleep(retryDelay)
+				continue
+			}
+			log.Fatalf("Failed to ping MongoDB after %d attempts: %v", maxRetries, err)
+		}
+
+		log.Println("Successfully connected to MongoDB!")
+		break
 	}
-	fmt.Println("Connected to MongoDB!")
 
 	// Get a handle for the files collection
 	filesCollection = client.Database("frostbyte").Collection("files")
