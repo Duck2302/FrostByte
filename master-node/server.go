@@ -28,7 +28,7 @@ func (s *MasterServer) setupRoutes() {
 	http.HandleFunc("/workers", s.workerManager.listWorkers)
 	http.HandleFunc("/test", s.workerManager.testWorker)
 	http.HandleFunc("/upload", s.fileOperations.uploadFile)
-	http.HandleFunc("/download", s.fileOperations.downloadFile)
+	http.HandleFunc("/download/", s.fileOperations.downloadFile)
 	http.HandleFunc("/delete", s.fileOperations.deleteFile)
 	http.HandleFunc("/files", s.fileOperations.listFiles)
 }

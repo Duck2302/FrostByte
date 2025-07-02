@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 )
 
 // writeJSONResponse writes a JSON response with the provided data
@@ -31,6 +32,15 @@ func getRequiredParam(r *http.Request, param string) (string, error) {
 		return "", fmt.Errorf("%s parameter is required", param)
 	}
 	return value, nil
+}
+
+func getDownloadPathParameter(r *http.Request) (string, error) {
+	fileName := strings.TrimPrefix(r.URL.Path, "/download/")
+	fmt.Println("filename searched for %s", fileName)
+	if fileName == "" {
+		return "", fmt.Errorf("no file was specified")
+	}
+	return fileName, nil
 }
 
 // validateHTTPMethod checks if the request method matches the expected method

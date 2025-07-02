@@ -75,7 +75,11 @@ func (fo *FileOperations) uploadFile(w http.ResponseWriter, r *http.Request) {
 }
 
 func (fo *FileOperations) downloadFile(w http.ResponseWriter, r *http.Request) {
-	filename, err := getRequiredParam(r, "filename")
+	if !validateHTTPMethod(w, r, http.MethodGet) {
+		return
+	}
+
+	filename, err := getDownloadPathParameter(r)
 	if err != nil {
 		writeErrorResponse(w, err.Error(), http.StatusBadRequest)
 		return
