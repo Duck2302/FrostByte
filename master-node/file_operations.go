@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"sort"
+	"sync"
 )
 
 type FileOperations struct {
@@ -52,26 +53,97 @@ func (fo *FileOperations) uploadFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fileData, err := io.ReadAll(r.Body)
+	// Use streaming coordinator instead of chunking in memory
+	streamCoordinator := NewStreamCoordinator(fo.workerManager, fo.chunkManager)
+	err = streamCoordinator.StreamUpload(filename, r.Body)
 	if err != nil {
-		writeErrorResponse(w, "Error reading file data", http.StatusInternalServerError)
+		writeErrorResponse(w, fmt.Sprintf("Streaming upload failed: %v", err), http.StatusInternalServerError)
 		return
 	}
 
-	if len(fileData) == 0 {
-		writeErrorResponse(w, "Empty file not allowed", http.StatusBadRequest)
+	log.Printf("File %s uploaded successfully via streaming", filename)
+	writeSuccessResponse(w, fmt.Sprintf("File %s uploaded successfully via streaming", filename))
+}
+
+// New method to handle streaming file chunking
+func (fo *FileOperations) streamAndChunkFile(filename string, reader io.Reader) error {
+	chunkBuffer := make([]byte, DefaultChunkSize)
+	chunkIndex := 0
+	var wg sync.WaitGroup
+	errors := make(chan error, 100) // Buffer for errors
+	semaphore := make(chan struct{}, fo.chunkManager.maxConcurrent)
+
+	for {
+		// Read chunk from the stream
+		bytesRead, err := io.ReadFull(reader, chunkBuffer)
+
+		// Handle end of file or partial read
+		if err == io.EOF {
+			break
+		}
+		if err == io.ErrUnexpectedEOF {
+			// Last chunk is smaller than buffer size
+			chunk := make([]byte, bytesRead)
+			copy(chunk, chunkBuffer[:bytesRead])
+
+			wg.Add(1)
+			go fo.uploadChunkAsync(filename, chunk, chunkIndex, &wg, errors, semaphore)
+			chunkIndex++
+			break
+		}
+		if err != nil {
+			return fmt.Errorf("error reading from stream: %v", err)
+		}
+
+		// Create a copy of the chunk data
+		chunk := make([]byte, bytesRead)
+		copy(chunk, chunkBuffer[:bytesRead])
+
+		// Upload chunk asynchronously
+		wg.Add(1)
+		go fo.uploadChunkAsync(filename, chunk, chunkIndex, &wg, errors, semaphore)
+		chunkIndex++
+	}
+
+	// Wait for all uploads to complete
+	wg.Wait()
+	close(errors)
+
+	// Check for errors
+	var uploadErrors []string
+	for err := range errors {
+		uploadErrors = append(uploadErrors, err.Error())
+	}
+
+	if len(uploadErrors) > 0 {
+		return fmt.Errorf("upload failed: %v", uploadErrors)
+	}
+
+	log.Printf("Successfully uploaded %d chunks for file %s", chunkIndex, filename)
+	return nil
+}
+
+// Helper method for async chunk upload
+func (fo *FileOperations) uploadChunkAsync(filename string, chunk []byte, chunkIndex int, wg *sync.WaitGroup, errors chan<- error, semaphore chan struct{}) {
+	defer wg.Done()
+
+	// Acquire semaphore
+	semaphore <- struct{}{}
+	defer func() { <-semaphore }()
+
+	workerID := fo.workerManager.SelectWorker()
+	if workerID == "" {
+		errors <- fmt.Errorf("no available workers for chunk %d", chunkIndex)
 		return
 	}
 
-	chunks := fo.splitFile(fileData, DefaultChunkSize)
-
-	if err := fo.chunkManager.UploadChunks(filename, chunks); err != nil {
-		writeErrorResponse(w, fmt.Sprintf("Upload failed: %v", err), http.StatusInternalServerError)
+	err := fo.chunkManager.sendChunkToWorker(filename, workerID, chunk, chunkIndex)
+	if err != nil {
+		errors <- fmt.Errorf("failed to send chunk %d to worker %s: %v", chunkIndex, workerID, err)
 		return
 	}
 
-	log.Printf("File %s uploaded successfully with %d chunks", filename, len(chunks))
-	writeSuccessResponse(w, fmt.Sprintf("File %s uploaded successfully with %d chunks", filename, len(chunks)))
+	log.Printf("Chunk %d uploaded successfully to worker %s", chunkIndex, workerID)
 }
 
 func (fo *FileOperations) downloadFile(w http.ResponseWriter, r *http.Request) {

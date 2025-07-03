@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"log"
@@ -164,9 +165,46 @@ func (ws *WorkerServer) handleWorkerTest(w http.ResponseWriter, r *http.Request)
 	writeSuccessResponse(w, fmt.Sprintf("Worker %s responding", ws.hostname))
 }
 
+func (ws *WorkerServer) handleStreamStore(w http.ResponseWriter, r *http.Request) {
+	if !validateHTTPMethod(w, r, http.MethodPost) {
+		return
+	}
+
+	chunkID, err := getRequiredParam(r, "chunkID")
+	if err != nil {
+		writeErrorResponse(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Stream directly to storage
+	var buffer bytes.Buffer
+	_, err = io.Copy(&buffer, r.Body)
+	if err != nil {
+		writeErrorResponse(w, "Failed to read streamed chunk data", http.StatusInternalServerError)
+		return
+	}
+
+	chunkData := buffer.Bytes()
+	if len(chunkData) == 0 {
+		writeErrorResponse(w, "Empty chunk data", http.StatusBadRequest)
+		return
+	}
+
+	err = ws.storage.Store(chunkID, chunkData)
+	if err != nil {
+		writeErrorResponse(w, "Failed to store chunk in database", http.StatusInternalServerError)
+		log.Printf("Error: %s", err)
+		return
+	}
+
+	log.Printf("Streamed chunk %s stored successfully (%d bytes)", chunkID, len(chunkData))
+	writeSuccessResponse(w, fmt.Sprintf("Chunk %s stored successfully", chunkID))
+}
+
 func (ws *WorkerServer) setupRoutes() {
 	http.HandleFunc("/worker-test", ws.handleWorkerTest)
 	http.HandleFunc("/store", ws.handleStoreChunk)
+	http.HandleFunc("/stream-store", ws.handleStreamStore) // New streaming endpoint
 	http.HandleFunc("/get", ws.handleGetChunk)
 	http.HandleFunc("/delete", ws.handleDeleteChunk)
 }

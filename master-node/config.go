@@ -1,10 +1,15 @@
 package main
 
-import "time"
+import (
+	"io"
+	"time"
+)
 
 // Worker represents a worker node in the cluster
 type Worker struct {
-	ID string
+	ID               string
+	CurrentChunkSize int64             // Track current chunk being written
+	StreamConn       *StreamConnection // Active connection for streaming
 }
 
 const (
@@ -13,12 +18,13 @@ const (
 	DefaultWorkerPort = "8081"
 
 	// File processing configuration
-	DefaultChunkSize     = 64 * 1024 * 1024 // 64MB
+	DefaultChunkSize     = 10 * 1024 * 1024 // 10MB
 	MaxConcurrentUploads = 5
+	StreamBufferSize     = 32 * 1024 // 32KB buffer for streaming
 
 	// Network configuration
-	NetworkTimeout  = 10 * time.Second
-	DatabaseTimeout = 10 * time.Second
+	NetworkTimeout  = 30 * time.Second
+	DatabaseTimeout = 30 * time.Second
 
 	// HTTP configuration
 	ContentTypeJSON        = "application/json"
@@ -29,3 +35,12 @@ const (
 	FilesCollection  = "files"
 	ChunksCollection = "chunks"
 )
+
+// StreamConnection manages active streaming to a worker
+type StreamConnection struct {
+	WorkerID     string
+	ChunkID      string
+	ChunkIndex   int
+	BytesWritten int64
+	Stream       io.WriteCloser
+}
