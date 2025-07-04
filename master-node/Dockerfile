@@ -28,6 +28,7 @@ COPY --from=builder /app/main .
 
 # Expose the application port
 EXPOSE 8080
+EXPOSE 6060
 
 # Command to run the application
 CMD ["./main"]

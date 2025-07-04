@@ -49,3 +49,24 @@ Store file chunks, serve master node requests.
 - **MongoDB metadata storage**
 - **Docker containerized** deployment
 - **REST API** for file operations
+
+
+## pprof commands
+
+   ### For simple profiling with web view
+   ```bash
+    go tool pprof -http=":6060" http://localhost:6060/debug/pprof/heap
+   ```
+
+      ```bash
+    go tool pprof http://localhost:6060/debug/pprof/profile?seconds=30
+   ```
+
+   ### For tool call from commandline
+         ```bash
+    go tool pprof http://localhost:6060/debug/pprof/heap 
+   ```
+
+   ### For online visualizer:
+
+   https://pprofweb.evanjones.ca

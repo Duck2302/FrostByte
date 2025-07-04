@@ -18,6 +18,7 @@ services:
     image: master-node
     ports:
       - "8080:8080"
+      #- "6060:6060" #pprof
     networks:
       - FrostByte_network
     depends_on:
@@ -40,6 +41,8 @@ services:
         condition: service_healthy
     networks:
       - FrostByte_network
+    #ports:
+      #- "6060:6060"   # pprof
 
 
 networks:
