@@ -15,10 +15,23 @@ Store file chunks, serve master node requests.
 
 ## API Endpoints
 
-- **Upload File**: `POST localhost:8080/upload?filename=test2.mp4`
-- **List Files**: `GET localhost:8080/files`
-- **Download File**: `POST localhost:8080/download?filename=test.pdf`
-- **Delete File**: `GET localhost:8080/delete?filename=test.mp4`
+- **Upload File**  
+  `POST http://localhost:8080/upload?filename=<filename>`  
+  Uploads a file. The file is split into chunks and distributed to worker nodes.
+
+- **List Files**  
+  `GET http://localhost:8080/files`  
+  Returns a JSON array of all stored filenames.
+
+- **Download File**  
+  `GET http://localhost:8080/download/<filename>`  
+  Downloads a file by streaming and reassembling its chunks.
+
+- **Delete File**  
+  `DELETE http://localhost:8080/delete?filename=<filename>`  
+  Deletes a file and its metadata from the system.
+
+---
 
 ## Quick Start
 
@@ -29,18 +42,22 @@ Store file chunks, serve master node requests.
 
 2. **Upload a file**:
    ```bash
-   curl -X POST -T your_file.txt "localhost:8080/upload?filename=your_file.txt"
+   curl -X POST -T your_file.txt "http://localhost:8080/upload?filename=your_file.txt"
    ```
 
 3. **List files**:
    ```bash
-   curl localhost:8080/files
+   curl http://localhost:8080/files
    ```
 
 4. **Download a file**:
    ```bash
-   curl -X POST "localhost:8080/download?filename=your_file.txt" -o downloaded_file.txt
+   curl -O http://localhost:8080/download/your_file.txt
    ```
+
+5. **Delete a file**:
+   ```bash
+   curl -X DELETE "http://localhost:8080/delete?filename
 
 ## Features
 
