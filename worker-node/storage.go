@@ -1,96 +1,78 @@
 package main
 
 import (
-	"database/sql"
-	"fmt"
-	"time"
+	"io"
+	"os"
+	"path/filepath"
 )
 
-// ChunkStorage defines the interface for chunk storage operations
 type ChunkStorage interface {
 	Store(chunkID string, data []byte) error
+	StoreStream(chunkID string, r io.Reader) error
 	Retrieve(chunkID string) ([]byte, error)
 	Delete(chunkID string) error
 	Exists(chunkID string) (bool, error)
 	Close() error
 }
 
-// SQLiteChunkStorage implements ChunkStorage using SQLite
-type SQLiteChunkStorage struct {
-	db *sql.DB
+type FileChunkStorage struct {
+	baseDir string
 }
 
-func NewSQLiteChunkStorage(dbPath string) (*SQLiteChunkStorage, error) {
-	// Configure SQLite for better concurrency
-	dsn := fmt.Sprintf("%s?_journal_mode=WAL&_sync=NORMAL&_timeout=10000&_busy_timeout=10000", dbPath)
-
-	db, err := sql.Open("sqlite3", dsn)
+func NewFileChunkStorage(baseDir string) (*FileChunkStorage, error) {
+	err := os.MkdirAll(baseDir, 0755)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open database: %v", err)
-	}
-
-	// Critical: Set connection pool to 1 for SQLite
-	db.SetMaxOpenConns(1)
-	db.SetMaxIdleConns(1)
-	db.SetConnMaxLifetime(time.Hour)
-
-	// Test connection
-	if err := db.Ping(); err != nil {
-		return nil, fmt.Errorf("failed to ping database: %v", err)
-	}
-
-	storage := &SQLiteChunkStorage{db: db}
-
-	// Initialize tables if needed
-	if err := storage.initTables(); err != nil {
-		return nil, fmt.Errorf("failed to initialize tables: %v", err)
-	}
-
-	return storage, nil
-}
-
-func (s *SQLiteChunkStorage) initTables() error {
-	createTableSQL := `CREATE TABLE IF NOT EXISTS chunks (
-        chunkID TEXT PRIMARY KEY NOT NULL,
-        chunkData BLOB NOT NULL
-    );`
-	_, err := s.db.Exec(createTableSQL)
-	return err
-}
-
-func (s *SQLiteChunkStorage) Store(chunkID string, data []byte) error {
-	insertChunkSQL := `INSERT OR REPLACE INTO chunks (chunkID, chunkData) VALUES (?, ?)`
-	_, err := s.db.Exec(insertChunkSQL, chunkID, data)
-	return err
-}
-
-func (s *SQLiteChunkStorage) Retrieve(chunkID string) ([]byte, error) {
-	getChunkSQL := `SELECT chunkData FROM chunks WHERE chunkID = ?`
-	var chunkData []byte
-
-	err := s.db.QueryRow(getChunkSQL, chunkID).Scan(&chunkData)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, nil
-		}
 		return nil, err
 	}
-
-	return chunkData, nil
+	return &FileChunkStorage{baseDir: baseDir}, nil
 }
 
-func (s *SQLiteChunkStorage) Delete(chunkID string) error {
-	deleteSQL := `DELETE FROM chunks WHERE chunkID = ?`
-	_, err := s.db.Exec(deleteSQL, chunkID)
+func (s *FileChunkStorage) chunkPath(chunkID string) string {
+	return filepath.Join(s.baseDir, chunkID)
+}
+
+func (s *FileChunkStorage) Store(chunkID string, data []byte) error {
+	path := s.chunkPath(chunkID)
+	return os.WriteFile(path, data, 0644)
+}
+
+func (s *FileChunkStorage) StoreStream(chunkID string, r io.Reader) error {
+	path := s.chunkPath(chunkID)
+	f, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	_, err = io.Copy(f, r)
 	return err
 }
 
-func (s *SQLiteChunkStorage) Exists(chunkID string) (bool, error) {
-	var count int
-	err := s.db.QueryRow("SELECT COUNT(*) FROM chunks WHERE chunkID = ?", chunkID).Scan(&count)
-	return count > 0, err
+func (s *FileChunkStorage) Retrieve(chunkID string) ([]byte, error) {
+	path := s.chunkPath(chunkID)
+	data, err := os.ReadFile(path)
+	if os.IsNotExist(err) {
+		return nil, nil
+	}
+	return data, err
 }
 
-func (s *SQLiteChunkStorage) Close() error {
-	return s.db.Close()
+func (s *FileChunkStorage) Delete(chunkID string) error {
+	path := s.chunkPath(chunkID)
+	return os.Remove(path)
+}
+
+func (s *FileChunkStorage) Exists(chunkID string) (bool, error) {
+	path := s.chunkPath(chunkID)
+	_, err := os.Stat(path)
+	if err == nil {
+		return true, nil
+	}
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	return false, err
+}
+
+func (s *FileChunkStorage) Close() error {
+	return nil
 }

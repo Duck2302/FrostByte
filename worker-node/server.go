@@ -1,9 +1,7 @@
 package main
 
 import (
-	"bytes"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 	"os"
@@ -15,8 +13,8 @@ type WorkerServer struct {
 	hostname string
 }
 
-func NewWorkerServer(dbPath string) (*WorkerServer, error) {
-	storage, err := NewSQLiteChunkStorage(dbPath)
+func NewWorkerServer(baseDir string) (*WorkerServer, error) {
+	storage, err := NewFileChunkStorage(baseDir)
 	if err != nil {
 		return nil, err
 	}
@@ -75,20 +73,9 @@ func (ws *WorkerServer) handleStoreChunk(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	chunkData, err := io.ReadAll(r.Body)
+	err = ws.storage.StoreStream(chunkID, r.Body)
 	if err != nil {
-		writeErrorResponse(w, "Failed to read chunk data", http.StatusInternalServerError)
-		return
-	}
-
-	if len(chunkData) == 0 {
-		writeErrorResponse(w, "Empty chunk data", http.StatusBadRequest)
-		return
-	}
-
-	err = ws.storage.Store(chunkID, chunkData)
-	if err != nil {
-		writeErrorResponse(w, "Failed to store chunk in database", http.StatusInternalServerError)
+		writeErrorResponse(w, "Failed to store chunk in file", http.StatusInternalServerError)
 		return
 	}
 
@@ -176,28 +163,14 @@ func (ws *WorkerServer) handleStreamStore(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// Stream directly to storage
-	var buffer bytes.Buffer
-	_, err = io.Copy(&buffer, r.Body)
+	err = ws.storage.StoreStream(chunkID, r.Body)
 	if err != nil {
-		writeErrorResponse(w, "Failed to read streamed chunk data", http.StatusInternalServerError)
-		return
-	}
-
-	chunkData := buffer.Bytes()
-	if len(chunkData) == 0 {
-		writeErrorResponse(w, "Empty chunk data", http.StatusBadRequest)
-		return
-	}
-
-	err = ws.storage.Store(chunkID, chunkData)
-	if err != nil {
-		writeErrorResponse(w, "Failed to store chunk in database", http.StatusInternalServerError)
+		writeErrorResponse(w, "Failed to store streamed chunk in file", http.StatusInternalServerError)
 		log.Printf("Error: %s", err)
 		return
 	}
 
-	log.Printf("Streamed chunk %s stored successfully (%d bytes)", chunkID, len(chunkData))
+	log.Printf("Streamed chunk %s stored successfully", chunkID)
 	writeSuccessResponse(w, fmt.Sprintf("Chunk %s stored successfully", chunkID))
 }
 
