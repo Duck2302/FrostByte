@@ -15,7 +15,7 @@ Store file chunks, serve master node requests.
 
 ## API Endpoints
 
-- **Upload File**  
+- **Upload File (only binary data supported)**  
   `POST http://localhost:8080/upload?filename=<filename>`  
   Uploads a file. The file is split into chunks and distributed to worker nodes.
 
@@ -45,17 +45,20 @@ Store file chunks, serve master node requests.
    curl -X POST -T your_file.txt "http://localhost:8080/upload?filename=your_file.txt"
    ```
 
-3. **List files**:
+   Postman Example:
+   ![Postman](./images/postman_screenshot.png)
+
+4. **List files**:
    ```bash
    curl http://localhost:8080/files
    ```
 
-4. **Download a file**:
+5. **Download a file**:
    ```bash
    curl -O http://localhost:8080/download/your_file.txt
    ```
 
-5. **Delete a file**:
+6. **Delete a file**:
    ```bash
    curl -X DELETE "http://localhost:8080/delete?filename
 
