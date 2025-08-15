@@ -41,12 +41,15 @@ Store file chunks, serve master node requests.
    ```
 
 2. **Upload a file**:
+   Postman Example(easier):
+   ![Postman](./images/postman_screenshot.png)
+
+   Most important thing is that the file is being uploaded as binary.
+
    ```bash
    curl -X POST -T your_file.txt "http://localhost:8080/upload?filename=your_file.txt"
    ```
-
-   Postman Example:
-   ![Postman](./images/postman_screenshot.png)
+   Also works but might fail in some environments.
 
 4. **List files**:
    ```bash
