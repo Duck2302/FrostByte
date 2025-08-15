@@ -37,7 +37,7 @@ Store file chunks, serve master node requests.
 
 1. **Start the system**:
    ```bash
-   docker-compose up --build
+   docker-compose up -d
    ```
 
 2. **Upload a file**:
