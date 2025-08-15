@@ -15,7 +15,7 @@ Store file chunks, serve master node requests.
 
 ## API Endpoints
 
-- **Upload File (only binary data supported)**  
+- **Upload File (only binary data supported, files like JPEG work best)**  
   `POST http://localhost:8080/upload?filename=<filename>`  
   Uploads a file. The file is split into chunks and distributed to worker nodes.
 
