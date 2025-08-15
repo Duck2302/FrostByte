@@ -19,11 +19,11 @@ Store file chunks, serve master node requests.
   `POST http://localhost:8080/upload?filename=<filename>`  
   Uploads a file. The file is split into chunks and distributed to worker nodes.
 
-- **List Files**  
+- **List Files (can be done in the browser**  
   `GET http://localhost:8080/files`  
   Returns a JSON array of all stored filenames.
 
-- **Download File**  
+- **Download File (can also be done in the browser)**  
   `GET http://localhost:8080/download/<filename>`  
   Downloads a file by streaming and reassembling its chunks.
 
