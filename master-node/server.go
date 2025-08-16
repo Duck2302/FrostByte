@@ -21,6 +21,19 @@ func NewMasterServer() *MasterServer {
 }
 
 func (s *MasterServer) setupRoutes() {
+	// Serve static files (HTML, CSS, JS)
+	fs := http.FileServer(http.Dir("./static/"))
+	http.Handle("/static/", http.StripPrefix("/static/", fs))
+
+	// Serve the main HTML page at root
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/" {
+			http.ServeFile(w, r, "./static/index.html")
+		} else {
+			http.NotFound(w, r)
+		}
+	})
+
 	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "OK")
 	})
