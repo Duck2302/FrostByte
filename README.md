@@ -26,11 +26,12 @@ Store file chunks, serve master node requests.
 
 ## Features
 
-- **Automatic file chunking** (10KB chunks)
-- **Distributed storage** across 5 worker nodes
+- **Automatic file chunking**
+- **Distributed storage** across 5 worker nodes by default
 - **MongoDB metadata storage**
 - **Docker containerized** deployment
 - **REST API** for file operations
+- **Web-UI** for easy usage
 
 
 
