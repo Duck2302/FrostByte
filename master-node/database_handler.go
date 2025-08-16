@@ -68,10 +68,15 @@ func storeChunkInDB(filename, chunkID, workerID string) error {
 
 	filter := bson.M{"filename": filename}
 
-	// Store chunks in flat structure since chunkID no longer contains dots
+	// Use array-based storage instead of object keys to avoid field name limitations
+	chunkInfo := bson.M{
+		"chunkId":  chunkID,
+		"workerId": workerID,
+	}
+
 	update := bson.M{
 		"$addToSet": bson.M{
-			fmt.Sprintf("chunks.%s", chunkID): workerID,
+			"chunks": chunkInfo,
 		},
 	}
 
@@ -93,13 +98,27 @@ func storeChunkInDB(filename, chunkID, workerID string) error {
 // Retrieve file metadata from the database
 func GetFileMetadata(ctx context.Context, filename string) (map[string][]string, error) {
 	var fileMetadata struct {
-		Chunks map[string][]string `bson:"chunks"`
+		Chunks []struct {
+			ChunkID  string `bson:"chunkId"`
+			WorkerID string `bson:"workerId"`
+		} `bson:"chunks"`
 	}
+
 	err := filesCollection.FindOne(ctx, bson.M{"filename": filename}).Decode(&fileMetadata)
 	if err != nil {
 		return nil, err
 	}
-	return fileMetadata.Chunks, nil
+
+	// Convert array format back to map format for compatibility
+	result := make(map[string][]string)
+	for _, chunk := range fileMetadata.Chunks {
+		if _, exists := result[chunk.ChunkID]; !exists {
+			result[chunk.ChunkID] = []string{}
+		}
+		result[chunk.ChunkID] = append(result[chunk.ChunkID], chunk.WorkerID)
+	}
+
+	return result, nil
 }
 
 // Delete file metadata from the database
