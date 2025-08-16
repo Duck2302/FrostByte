@@ -19,7 +19,8 @@ Store file chunks, serve master node requests.
    docker-compose up -d --build
    ```
 
-2. **Open the interface**:
+2. **Open the interface on http://localhost:8080**:
+
    ![FrostByte-Web-UI](./images/Web-UI-FrostByte.gif)
 
 
