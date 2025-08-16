@@ -15,15 +15,15 @@ Store file chunks, serve master node requests.
 
 ## API Endpoints
 
-- **Upload File**  
+- **Upload File (only binary data supported, files like JPEG work best)**  
   `POST http://localhost:8080/upload?filename=<filename>`  
   Uploads a file. The file is split into chunks and distributed to worker nodes.
 
-- **List Files**  
+- **List Files (can be done in the browser**  
   `GET http://localhost:8080/files`  
   Returns a JSON array of all stored filenames.
 
-- **Download File**  
+- **Download File (can also be done in the browser)**  
   `GET http://localhost:8080/download/<filename>`  
   Downloads a file by streaming and reassembling its chunks.
 
@@ -37,25 +37,31 @@ Store file chunks, serve master node requests.
 
 1. **Start the system**:
    ```bash
-   docker-compose up --build
+   docker-compose up -d
    ```
 
 2. **Upload a file**:
+   Postman Example(easier):
+   ![Postman](./images/postman_screenshot.png)
+
+   Most important thing is that the file is being uploaded as binary.
+
    ```bash
    curl -X POST -T your_file.txt "http://localhost:8080/upload?filename=your_file.txt"
    ```
+   Also works but might fail in some environments.
 
-3. **List files**:
+4. **List files**:
    ```bash
    curl http://localhost:8080/files
    ```
 
-4. **Download a file**:
+5. **Download a file**:
    ```bash
    curl -O http://localhost:8080/download/your_file.txt
    ```
 
-5. **Delete a file**:
+6. **Delete a file**:
    ```bash
    curl -X DELETE "http://localhost:8080/delete?filename
 
