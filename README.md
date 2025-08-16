@@ -4,7 +4,7 @@
 
 ## Architecture
 
-### Client
+### Web-UI
 Interface for users to read/write files.
 
 ### Master Node (Metadata Server)
