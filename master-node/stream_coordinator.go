@@ -5,6 +5,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"time"
 )
 
 type StreamCoordinator struct {
@@ -95,18 +96,24 @@ func (sc *StreamCoordinator) startNewChunk(filename string, chunkIndex int) (*St
 	// Use a pipe to create streaming connection
 	pr, pw := io.Pipe()
 
+	// Create a channel to track the upload result
+	resultChan := make(chan error, 1)
+
 	// Start HTTP request in goroutine
 	go func() {
 		defer pr.Close()
 		resp, err := http.Post(url, ContentTypeOctetStream, pr)
 		if err != nil {
 			log.Printf("Failed to stream to worker %s: %v", workerID, err)
+			resultChan <- err
 			return
 		}
 		defer resp.Body.Close()
 
 		if resp.StatusCode != http.StatusOK {
-			log.Printf("Worker %s returned error: %s", workerID, resp.Status)
+			err := fmt.Errorf("worker %s returned error: %s", workerID, resp.Status)
+			log.Printf("%v", err)
+			resultChan <- err
 			return
 		}
 
@@ -114,7 +121,11 @@ func (sc *StreamCoordinator) startNewChunk(filename string, chunkIndex int) (*St
 		err = storeChunkInDB(filename, chunkID, workerID)
 		if err != nil {
 			log.Printf("Failed to store chunk metadata: %v", err)
+			resultChan <- err
+			return
 		}
+
+		resultChan <- nil
 	}()
 
 	return &StreamConnection{
@@ -123,6 +134,7 @@ func (sc *StreamCoordinator) startNewChunk(filename string, chunkIndex int) (*St
 		ChunkIndex:   chunkIndex,
 		BytesWritten: 0,
 		Stream:       pw,
+		ResultChan:   resultChan,
 	}, nil
 }
 
@@ -131,6 +143,20 @@ func (sc *StreamCoordinator) closeCurrentStream(filename string, stream *StreamC
 	if err != nil {
 		log.Printf("Error closing stream to worker %s: %v", stream.WorkerID, err)
 		return err
+	}
+
+	// Wait for the upload goroutine to complete and check for errors
+	if stream.ResultChan != nil {
+		select {
+		case uploadErr := <-stream.ResultChan:
+			if uploadErr != nil {
+				log.Printf("Upload failed for chunk %s to worker %s: %v",
+					stream.ChunkID, stream.WorkerID, uploadErr)
+				return uploadErr
+			}
+		case <-time.After(30 * time.Second): // Add timeout
+			return fmt.Errorf("timeout waiting for chunk %s upload to complete", stream.ChunkID)
+		}
 	}
 
 	log.Printf("Completed chunk %s to worker %s (%d bytes)",

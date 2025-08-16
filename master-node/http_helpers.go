@@ -36,7 +36,7 @@ func getRequiredParam(r *http.Request, param string) (string, error) {
 
 func getDownloadPathParameter(r *http.Request) (string, error) {
 	fileName := strings.TrimPrefix(r.URL.Path, "/download/")
-	fmt.Println("filename searched for %s", fileName)
+	fmt.Printf("filename searched for %s", fileName)
 	if fileName == "" {
 		return "", fmt.Errorf("no file was specified")
 	}
