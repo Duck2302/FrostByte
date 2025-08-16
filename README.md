@@ -14,12 +14,14 @@ Manages file locations, metadata, serves client requests and access control.
 Store file chunks, serve master node requests.
 ## Quick Start
 
-1. **Start the system**:
+1. **Clone the repo locally**
+
+2. **Start the system**:
    ```bash
    docker-compose up -d --build
    ```
 
-2. **Open the interface on http://localhost:8080**:
+3. **Open the interface on http://localhost:8080**:
 
    ![FrostByte-Web-UI](./images/Web-UI-FrostByte.gif)
 
