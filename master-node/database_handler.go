@@ -15,8 +15,15 @@ var client *mongo.Client
 var filesCollection *mongo.Collection
 
 func init() {
-	// Set client options
-	clientOptions := options.Client().ApplyURI("mongodb://mongodb:27017")
+	// Set client options with connection pooling
+	clientOptions := options.Client().
+		ApplyURI("mongodb://mongodb:27017").
+		SetMaxPoolSize(50).                   // Maximum number of connections in pool
+		SetMinPoolSize(5).                    // Minimum number of connections in pool
+		SetMaxConnIdleTime(30 * time.Minute). // Close connections after 30 minutes of inactivity
+		SetServerSelectionTimeout(10 * time.Second).
+		SetSocketTimeout(30 * time.Second).
+		SetConnectTimeout(10 * time.Second)
 
 	// Connect to MongoDB with retry logic
 	maxRetries := 10
@@ -56,7 +63,7 @@ func init() {
 }
 
 func storeChunkInDB(filename, chunkID, workerID string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second) // Increase timeout
 	defer cancel()
 
 	filter := bson.M{"filename": filename}
@@ -69,9 +76,14 @@ func storeChunkInDB(filename, chunkID, workerID string) error {
 	}
 
 	opts := options.Update().SetUpsert(true)
-	_, err := filesCollection.UpdateOne(ctx, filter, update, opts)
+	result, err := filesCollection.UpdateOne(ctx, filter, update, opts)
 	if err != nil {
 		return fmt.Errorf("failed to store chunk in database: %v", err)
+	}
+
+	// Verify the update was successful
+	if result.ModifiedCount == 0 && result.UpsertedCount == 0 && result.MatchedCount == 0 {
+		log.Printf("Warning: No documents were modified when storing chunk %s", chunkID)
 	}
 
 	log.Printf("Stored chunk %s for file %s with worker %s", chunkID, filename, workerID)

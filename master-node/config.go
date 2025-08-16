@@ -43,4 +43,5 @@ type StreamConnection struct {
 	ChunkIndex   int
 	BytesWritten int64
 	Stream       io.WriteCloser
+	ResultChan   chan error // Channel to track upload completion
 }

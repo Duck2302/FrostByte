@@ -7,12 +7,29 @@ import (
 	"log"
 	"net/http"
 	"sort"
+	"strconv"
+	"strings"
 	"sync"
 )
 
 type FileOperations struct {
 	workerManager *WorkerManager
 	chunkManager  *ChunkManager
+}
+
+// extractChunkIndex extracts the chunk index from chunk ID for proper sorting
+func extractChunkIndex(chunkID string) int {
+	// ChunkID format: filename_chunk_########
+	parts := strings.Split(chunkID, "_chunk_")
+	if len(parts) != 2 {
+		return 0 // fallback for malformed chunk IDs
+	}
+
+	index, err := strconv.Atoi(parts[1])
+	if err != nil {
+		return 0 // fallback for invalid index
+	}
+	return index
 }
 
 func NewFileOperations(wm *WorkerManager) *FileOperations {
@@ -52,6 +69,7 @@ func (fo *FileOperations) uploadFile(w http.ResponseWriter, r *http.Request) {
 		writeErrorResponse(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	log.Printf("Request Header: %s", r.Header)
 
 	// Use streaming coordinator instead of chunking in memory
 	streamCoordinator := NewStreamCoordinator(fo.workerManager, fo.chunkManager)
@@ -172,7 +190,14 @@ func (fo *FileOperations) downloadFile(w http.ResponseWriter, r *http.Request) {
 	for chunkID := range fileChunks {
 		chunkIDs = append(chunkIDs, chunkID)
 	}
-	sort.Strings(chunkIDs)
+
+	// Sort by extracting chunk index for proper numerical ordering
+	sort.Slice(chunkIDs, func(i, j int) bool {
+		// Extract chunk indices from chunk IDs (format: filename_chunk_########)
+		iIndex := extractChunkIndex(chunkIDs[i])
+		jIndex := extractChunkIndex(chunkIDs[j])
+		return iIndex < jIndex
+	})
 
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", filename))
 	w.Header().Set("Content-Type", ContentTypeOctetStream)
