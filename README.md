@@ -15,11 +15,18 @@ Store file chunks, serve master node requests.
 ## Quick Start
 
 1. **Clone the repo locally**
+```bash
+# Clone the repository
+git clone https://github.com/Duck2302/FrostByte.git
+cd frostbyte
+
+```
+
 
 2. **Start the system**:
-   ```bash
-   docker-compose up -d --build
-   ```
+```bash
+docker-compose up -d --build
+```
 
 3. **Open the interface on http://localhost:8080**:
 
