@@ -12,27 +12,6 @@ Manages file locations, metadata, serves client requests and access control.
 
 ### Worker Nodes (Storage Nodes)
 Store file chunks, serve master node requests.
-
-## API Endpoints
-
-- **Upload File (only binary data supported, files like JPEG work best)**  
-  `POST http://localhost:8080/upload?filename=<filename>`  
-  Uploads a file. The file is split into chunks and distributed to worker nodes.
-
-- **List Files (can be done in the browser**  
-  `GET http://localhost:8080/files`  
-  Returns a JSON array of all stored filenames.
-
-- **Download File (can also be done in the browser)**  
-  `GET http://localhost:8080/download/<filename>`  
-  Downloads a file by streaming and reassembling its chunks.
-
-- **Delete File**  
-  `DELETE http://localhost:8080/delete?filename=<filename>`  
-  Deletes a file and its metadata from the system.
-
----
-
 ## Quick Start
 
 1. **Start the system**:
@@ -40,30 +19,10 @@ Store file chunks, serve master node requests.
    docker-compose up -d --build
    ```
 
-2. **Upload a file**:
-   Postman Example(easier):
-   ![Postman](./images/postman_screenshot.png)
+2. **Open the interface**:
+   ![FrostByte-Web-UI](./images/Web-UI-FrostByte.gif)
 
-   Most important thing is that the file is being uploaded as binary.
 
-   ```bash
-   curl -X POST -T your_file.txt "http://localhost:8080/upload?filename=your_file.txt"
-   ```
-   Also works but might fail in some environments.
-
-4. **List files**:
-   ```bash
-   curl http://localhost:8080/files
-   ```
-
-5. **Download a file**:
-   ```bash
-   curl -O http://localhost:8080/download/your_file.txt
-   ```
-
-6. **Delete a file**:
-   ```bash
-   curl -X DELETE "http://localhost:8080/delete?filename
 
 ## Features
 
@@ -74,7 +33,31 @@ Store file chunks, serve master node requests.
 - **REST API** for file operations
 
 
-## pprof commands
+
+## API Endpoints (internally used)
+
+- **Upload File (binary)**  
+  `POST http://localhost:8080/upload?filename=<filename>`  
+  Uploads a file. The file is split into chunks and distributed to worker nodes.
+
+- **List Files**  
+  `GET http://localhost:8080/files`  
+  Returns a JSON array of all stored filenames.
+
+- **Download File**  
+  `GET http://localhost:8080/download/<filename>`  
+  Downloads a file by streaming and reassembling its chunks.
+
+- **Delete File**  
+  `DELETE http://localhost:8080/delete?filename=<filename>`  
+  Deletes a file and its metadata from the system.
+
+---
+
+
+## pprof commands for profiling
+
+   ### expose ports in the docker-compose file
 
    ### For simple profiling with web view
    ```bash
