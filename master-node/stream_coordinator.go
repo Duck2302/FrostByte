@@ -27,9 +27,54 @@ func (sc *StreamCoordinator) StreamUpload(filename string, reader io.Reader) err
 
 	for {
 		bytesRead, err := reader.Read(buffer)
+
+		// Handle EOF - process any remaining data first
 		if err == io.EOF {
+			// Process any remaining data in the buffer
+			if bytesRead > 0 {
+				data := buffer[:bytesRead]
+				// Process the remaining data in chunks
+				for len(data) > 0 {
+					// Start new chunk if needed
+					if currentStream == nil || currentStream.BytesWritten >= DefaultChunkSize {
+						if currentStream != nil {
+							closeErr := sc.closeCurrentStream(filename, currentStream)
+							if closeErr != nil {
+								return closeErr
+							}
+						}
+
+						currentStream, err = sc.startNewChunk(filename, chunkIndex)
+						if err != nil {
+							return err
+						}
+						chunkIndex++
+					}
+
+					// Write as much as possible to current chunk
+					remainingInChunk := DefaultChunkSize - currentStream.BytesWritten
+					writeSize := int64(len(data))
+					if writeSize > remainingInChunk {
+						writeSize = remainingInChunk
+					}
+
+					written, err := currentStream.Stream.Write(data[:writeSize])
+					if err != nil {
+						currentStream.Stream.Close()
+						return fmt.Errorf("error writing to worker stream: %v", err)
+					}
+
+					currentStream.BytesWritten += int64(written)
+					data = data[written:]
+				}
+			}
+
+			// Close the current stream if any
 			if currentStream != nil {
-				sc.closeCurrentStream(filename, currentStream)
+				err := sc.closeCurrentStream(filename, currentStream)
+				if err != nil {
+					return err
+				}
 			}
 			break
 		}
