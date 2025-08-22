@@ -20,7 +20,13 @@ func NewStreamCoordinator(wm *WorkerManager, cm *ChunkManager) *StreamCoordinato
 	}
 }
 
-func (sc *StreamCoordinator) StreamUpload(filename string, reader io.Reader) error {
+func (sc *StreamCoordinator) StreamUpload(filename string, reader io.Reader, fileSize int64) error {
+	// Store file metadata first
+	err := storeFileMetadata(filename, fileSize)
+	if err != nil {
+		return fmt.Errorf("failed to store file metadata: %v", err)
+	}
+
 	buffer := make([]byte, StreamBufferSize)
 	chunkIndex := 0
 	var currentStream *StreamConnection

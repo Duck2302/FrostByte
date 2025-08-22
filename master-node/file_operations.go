@@ -69,11 +69,50 @@ func (fo *FileOperations) uploadFile(w http.ResponseWriter, r *http.Request) {
 		writeErrorResponse(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	log.Printf("Request Header: %s", r.Header)
 
-	// Use streaming coordinator instead of chunking in memory
+	// Get file size parameter
+	sizeParam, err := getRequiredParam(r, "size")
+	if err != nil {
+		writeErrorResponse(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	fileSize, err := strconv.ParseInt(sizeParam, 10, 64)
+	if err != nil {
+		writeErrorResponse(w, "Invalid file size parameter", http.StatusBadRequest)
+		return
+	}
+
+	log.Printf("Request Header: %s", r.Header)
+	log.Printf("Uploading file %s with size %d bytes", filename, fileSize)
+
+	// Check Content-Type to determine if it's multipart form data or raw file
+	contentType := r.Header.Get("Content-Type")
+	var fileReader io.Reader
+
+	if strings.Contains(contentType, "multipart/form-data") {
+		// Parse multipart form data
+		err := r.ParseMultipartForm(32 << 20) // 32 MB max memory
+		if err != nil {
+			writeErrorResponse(w, fmt.Sprintf("Failed to parse multipart form: %v", err), http.StatusBadRequest)
+			return
+		}
+
+		file, _, err := r.FormFile("file")
+		if err != nil {
+			writeErrorResponse(w, fmt.Sprintf("Failed to get file from form: %v", err), http.StatusBadRequest)
+			return
+		}
+		defer file.Close()
+		fileReader = file
+	} else {
+		// Raw file data in body
+		fileReader = r.Body
+	}
+
+	// Use streaming coordinator
 	streamCoordinator := NewStreamCoordinator(fo.workerManager, fo.chunkManager)
-	err = streamCoordinator.StreamUpload(filename, r.Body)
+	err = streamCoordinator.StreamUpload(filename, fileReader, fileSize)
 	if err != nil {
 		writeErrorResponse(w, fmt.Sprintf("Streaming upload failed: %v", err), http.StatusInternalServerError)
 		return
@@ -280,17 +319,17 @@ func (fo *FileOperations) listFiles(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(context.Background(), DatabaseTimeout)
 	defer cancel()
 
-	filenames, err := GetAllFilenames(ctx)
+	files, err := GetAllFilenames(ctx)
 	if err != nil {
 		log.Printf("Failed to retrieve file metadata from database: %v", err)
 		writeErrorResponse(w, "Failed to retrieve file metadata", http.StatusInternalServerError)
 		return
 	}
 
-	if err := writeJSONResponse(w, filenames); err != nil {
-		log.Printf("Failed to encode filenames: %v", err)
-		writeErrorResponse(w, "Failed to encode filenames", http.StatusInternalServerError)
+	if err := writeJSONResponse(w, files); err != nil {
+		log.Printf("Failed to encode file metadata: %v", err)
+		writeErrorResponse(w, "Failed to encode file metadata", http.StatusInternalServerError)
 		return
 	}
-	log.Println("File list successfully retrieved")
+	log.Println("File list with metadata successfully retrieved")
 }

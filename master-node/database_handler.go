@@ -95,6 +95,31 @@ func storeChunkInDB(filename, chunkID, workerID string) error {
 	return nil
 }
 
+func storeFileMetadata(filename string, fileSize int64) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	filter := bson.M{"filename": filename}
+	update := bson.M{
+		"$set": bson.M{
+			"filename": filename,
+			"size":     fileSize,
+		},
+		"$setOnInsert": bson.M{
+			"chunks": []bson.M{},
+		},
+	}
+
+	opts := options.Update().SetUpsert(true)
+	_, err := filesCollection.UpdateOne(ctx, filter, update, opts)
+	if err != nil {
+		return fmt.Errorf("failed to store file metadata: %v", err)
+	}
+
+	log.Printf("Stored metadata for file %s with size %d", filename, fileSize)
+	return nil
+}
+
 // Retrieve file metadata from the database
 func GetFileMetadata(ctx context.Context, filename string) (map[string][]string, error) {
 	var fileMetadata struct {
@@ -131,9 +156,15 @@ func DeleteFileMetadata(ctx context.Context, filename string) error {
 	return nil
 }
 
-// GetAllFilenames retrieves a list of all filenames in the database
-func GetAllFilenames(ctx context.Context) ([]string, error) {
-	var filenames []string
+// FileInfo represents a file with its metadata
+type FileInfo struct {
+	Filename string `json:"filename" bson:"filename"`
+	Size     int64  `json:"size" bson:"size"`
+}
+
+// GetAllFilenames retrieves a list of all files with their metadata
+func GetAllFilenames(ctx context.Context) ([]FileInfo, error) {
+	var files []FileInfo
 
 	// Find all documents in the collection
 	cursor, err := filesCollection.Find(ctx, bson.M{})
@@ -142,15 +173,13 @@ func GetAllFilenames(ctx context.Context) ([]string, error) {
 	}
 	defer cursor.Close(ctx)
 
-	// Iterate through the cursor and extract filenames
+	// Iterate through the cursor and extract file info
 	for cursor.Next(ctx) {
-		var file struct {
-			Filename string `bson:"filename"`
-		}
+		var file FileInfo
 		if err := cursor.Decode(&file); err != nil {
 			return nil, err
 		}
-		filenames = append(filenames, file.Filename)
+		files = append(files, file)
 	}
 
 	// Check for any errors during iteration
@@ -158,5 +187,5 @@ func GetAllFilenames(ctx context.Context) ([]string, error) {
 		return nil, err
 	}
 
-	return filenames, nil
+	return files, nil
 }

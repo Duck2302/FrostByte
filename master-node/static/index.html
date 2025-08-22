@@ -458,9 +458,9 @@
                     resetUploadState();
                 };
 
-                // Send request
-                xhr.open('POST', `/upload?filename=${encodeURIComponent(file.name)}`, true);
-                xhr.send(file);
+                // Send request with filename and size as query parameters
+                xhr.open('POST', `/upload?filename=${encodeURIComponent(file.name)}&size=${file.size}`, true);
+                xhr.send(formData);
 
             } catch (error) {
                 showStatus(`Upload failed: ${error.message}`, 'error');
@@ -502,6 +502,7 @@
                 }
                 
                 const files = await response.json();
+                console.log(files)
                 displayFiles(files);
             } catch (error) {
                 console.error('Failed to load files:', error);
@@ -525,19 +526,23 @@
                 return;
             }
 
-            filesList.innerHTML = files.map(filename => `
-                <li class="file-item">
-                    <span class="file-name">📄 ${filename}</span>
-                    <div class="file-actions">
-                        <button class="download-btn" onclick="downloadFile('${filename}')">
-                            ⬇️ Download
-                        </button>
-                        <button class="delete-btn" onclick="deleteFile('${filename}')">
-                            🗑️ Delete
-                        </button>
-                    </div>
-                </li>
-            `).join('');
+            filesList.innerHTML = files.map(file => {
+                // file: { filename: string, size: number }
+                const fileSize = formatFileSize(file.size);
+                return `
+                    <li class="file-item">
+                        <span class="file-name">📄 ${file.filename} <span style='color:#888;font-size:0.95em;'>(${fileSize})</span></span>
+                        <div class="file-actions">
+                            <button class="download-btn" onclick="downloadFile('${file.filename}')">
+                                ⬇️ Download
+                            </button>
+                            <button class="delete-btn" onclick="deleteFile('${file.filename}')">
+                                🗑️ Delete
+                            </button>
+                        </div>
+                    </li>
+                `;
+            }).join('');
         }
 
         function downloadFile(filename) {
